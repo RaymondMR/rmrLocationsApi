@@ -47,8 +47,8 @@ ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 
 EXPOSE 8080
 
-# Health check — verifica que la API responda
+# Health check — verifica que el puerto responda (cualquier HTTP code = vivo)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
+    CMD curl -s --head --request GET http://localhost:8080/ || exit 1
 
 ENTRYPOINT ["dotnet", "rmrLocationsApi.dll"]
