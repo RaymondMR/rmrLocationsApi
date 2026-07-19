@@ -53,7 +53,7 @@ services:
   # rmrLocationsApi — API .NET 8
   # =============================================
   api:
-    image: ghcr.io/raymondmr/rmrlocationsapi:latest
+    image: ghcr.io/raymondmr/rmrlocationsapi:latest    # GHCR requiere minúsculas
     container_name: rmrlocations-api
     restart: unless-stopped
     environment:
