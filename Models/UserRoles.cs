@@ -1,4 +1,4 @@
-namespace WebAppTest1.Models
+namespace rmrLocationsApi.Models
 {
     public static class UserRoles
     {

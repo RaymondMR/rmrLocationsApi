@@ -1,0 +1,28 @@
+TAREAS:
+
+"fan out subagents" so send a team. Each one digs deep so nothing gets missed.
+
+1.-Lee primero todo el texto completo
+
+2.-Corrige los namespaces de todos los archivos en la carpeta Models y reemplázalos apropiadamente y óptimamente por el  namespace rmrLocationsApi.Controllers
+
+3.- Elimina la clase: Producto (public class Producto y el archivo: ) y el archivo:  ".\Models\Producto.cs", eliminando tambien la clase: public class ProductsController : ControllerBase y el archivo: ".\Controllers\ProductsController.cs", el servcicio: ProductService.cs y la interface: IProductService.cs, ya que en este proyecto no se trabajara con la clase Product, pero en esta etapa aun no hagas Migrations, porque hay mas tareas.
+
+4.-Lee los archivos CLAUDE02.md y NOTAS-MODELO.md, para que tengas el contexto completo
+
+5.- Ya se crearon los controllers , Interfaces y servicios respectivos, de las Entidades Raiz: 
+AddressController.cs
+LocationController.cs
+CategoryController.cs
+TagController.cs
+
+6.- Revisa los dos archivos: LocationService.cs y LocationService.2 y fusionálos en uno solo: LocationService.cs, que funcione y se integre bien con el proyecto 
+lo mismo para los archivos AppDbContext.cs y LocationsDbContext.cs
+
+7.-Implementa las demás interfaces, servicios  y controllers necesarios de acuerdo a lo establecido en los archivos: CLAUDE02.md y NOTAS-MODELO.md
+
+8.-El objetivo es implementar la API completa
+
+9.-Cuando consideres necesario, elabora las migraciones y update the database
+
+10.-Al finalizar report backs las modificaciones, problemas, y soluciones que implementaste.

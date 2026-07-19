@@ -1,0 +1,352 @@
+@baseUrl = https://localhost:5113
+
+### ===================================================================
+### AUTH ENDPOINTS
+### ===================================================================
+
+### 1. Register new test user
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+    "userName": "testuser",
+    "email": "testuser@test.com",
+    "password": "Test123!"
+}
+
+### 2. Login with test user
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+    "userName": "testuser",
+    "email": "testuser@test.com",
+    "password": "Test123!"
+}
+
+### 3. Admin login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+    "userName": "admin",
+    "email": "admin@rmrlocations.com",
+    "password": "Admin123!"
+}
+
+### 4. Get authenticated user info (auth-only)
+GET {{baseUrl}}/api/auth
+Authorization: Bearer {{accessToken}}
+
+### 5. Admin-only endpoint
+GET {{baseUrl}}/api/auth/admin-only
+Authorization: Bearer {{accessToken}}
+
+### 6. Refresh token
+POST {{baseUrl}}/api/auth/refresh-token
+Content-Type: application/json
+
+{
+    "userId": "{{userId}}",
+    "refreshToken": "{{refreshToken}}"
+}
+
+### 7. Change password
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+    "currentPassword": "Test123!",
+    "newPassword": "Test456!"
+}
+
+### 8. Logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### ===================================================================
+### LOCATION ENDPOINTS
+### ===================================================================
+
+### 9. Get all locations
+GET {{baseUrl}}/api/location
+
+### 10. Create location
+POST {{baseUrl}}/api/location
+Content-Type: application/json
+
+{
+    "name": "Test Cafe Central",
+    "slug": "test-cafe-central",
+    "description": "Una cafeteria de prueba en el centro",
+    "coordinates": { "X": -99.1332, "Y": 19.4326, "SRID": 4326 },
+    "address": {
+        "name": "Sucursal Centro",
+        "street": "Av. Reforma",
+        "exteriorNumber": "222",
+        "neighborhood": "Juarez",
+        "city": "Ciudad de Mexico",
+        "state": "CDMX",
+        "postalCode": "06600",
+        "countryCode": "MX"
+    },
+    "status": "Published",
+    "isPublic": true,
+    "websiteUrl": "https://cafecentral.test",
+    "phoneNumber": "+525512345678",
+    "averageRating": 0,
+    "reviewCount": 0,
+    "ownerId": "{{ownerId}}"
+}
+
+### 11. Get location by ID
+GET {{baseUrl}}/api/location/{{locationId}}
+
+### 12. Update location
+PUT {{baseUrl}}/api/location/{{locationId}}
+Content-Type: application/json
+
+{
+    "id": "{{locationId}}",
+    "name": "Test Cafe Central MODIFICADO",
+    "slug": "test-cafe-central-mod",
+    "description": "Descripcion actualizada",
+    "coordinates": { "X": -99.1332, "Y": 19.4326, "SRID": 4326 },
+    "address": {
+        "name": "Sucursal Centro MOD",
+        "street": "Av. Reforma",
+        "exteriorNumber": "333",
+        "neighborhood": "Juarez",
+        "city": "Ciudad de Mexico",
+        "state": "CDMX",
+        "postalCode": "06600",
+        "countryCode": "MX"
+    },
+    "status": "Published",
+    "isPublic": true,
+    "websiteUrl": "https://cafecentral.test",
+    "phoneNumber": "+525512345678",
+    "averageRating": 0,
+    "reviewCount": 0,
+    "ownerId": "{{ownerId}}"
+}
+
+### 13. Nearby search (Zocalo CDMX, 5km)
+GET {{baseUrl}}/api/location/nearby?latitude=19.4326&longitude=-99.1332&radiusMeters=5000&take=10
+
+### 14. Combined search
+GET {{baseUrl}}/api/location/search?latitude=19.4326&longitude=-99.1332&radiusMeters=5000
+
+### 15. Soft delete location
+POST {{baseUrl}}/api/location/{{locationId}}/soft-delete
+
+### 16. Restore location
+POST {{baseUrl}}/api/location/{{locationId}}/restore
+
+### 17. Hard delete location
+DELETE {{baseUrl}}/api/location/{{locationId}}
+
+### ===================================================================
+### CATEGORY ENDPOINTS
+### ===================================================================
+
+### 18. Get all categories
+GET {{baseUrl}}/api/category
+
+### 19. Create category
+POST {{baseUrl}}/api/category
+Content-Type: application/json
+
+{
+    "name": "Cafeterias Test",
+    "slug": "cafeterias-test",
+    "description": "Cafeterias y lugares para tomar cafe",
+    "iconName": "coffee",
+    "colorHex": "#8B4513",
+    "sortOrder": 1
+}
+
+### 20. Get category by ID
+GET {{baseUrl}}/api/category/{{categoryId}}
+
+### 21. Update category
+PUT {{baseUrl}}/api/category/{{categoryId}}
+Content-Type: application/json
+
+{
+    "id": "{{categoryId}}",
+    "name": "Cafeterias Test MOD",
+    "slug": "cafeterias-test-mod",
+    "description": "Descripcion actualizada",
+    "iconName": "coffee-alt",
+    "colorHex": "#A0522D",
+    "sortOrder": 2
+}
+
+### 22. Delete category
+DELETE {{baseUrl}}/api/category/{{categoryId}}
+
+### ===================================================================
+### TAG ENDPOINTS
+### ===================================================================
+
+### 23. Get all tags
+GET {{baseUrl}}/api/tag
+
+### 24. Create tag
+POST {{baseUrl}}/api/tag
+Content-Type: application/json
+
+{
+    "name": "wifi-gratis-test",
+    "slug": "wifi-gratis-test",
+    "description": "Lugares con WiFi gratuito"
+}
+
+### 25. Get tag by ID
+GET {{baseUrl}}/api/tag/{{tagId}}
+
+### 26. Update tag
+PUT {{baseUrl}}/api/tag/{{tagId}}
+Content-Type: application/json
+
+{
+    "id": "{{tagId}}",
+    "name": "wifi-premium-test",
+    "slug": "wifi-premium-test",
+    "description": "WiFi de alta velocidad"
+}
+
+### 27. Delete tag
+DELETE {{baseUrl}}/api/tag/{{tagId}}
+
+### ===================================================================
+### REVIEW ENDPOINTS
+### ===================================================================
+
+### 28. Get reviews by location
+GET {{baseUrl}}/api/review/location/{{locationId}}
+
+### 29. Create review
+POST {{baseUrl}}/api/review
+Content-Type: application/json
+
+{
+    "locationId": "{{locationId}}",
+    "userId": "{{ownerId}}",
+    "rating": 4,
+    "title": "Buen cafe",
+    "body": "Muy buen espresso y excelente ambiente."
+}
+
+### 30. Get review by ID
+GET {{baseUrl}}/api/review/{{reviewId}}
+
+### 31. Update review
+PUT {{baseUrl}}/api/review/{{reviewId}}
+Content-Type: application/json
+
+{
+    "id": "{{reviewId}}",
+    "locationId": "{{locationId}}",
+    "userId": "{{ownerId}}",
+    "rating": 5,
+    "title": "Excelente cafe!",
+    "body": "Volvi y mejoro aun mas. El capuccino es increible."
+}
+
+### 32. Delete review
+DELETE {{baseUrl}}/api/review/{{reviewId}}
+
+### ===================================================================
+### MEDIA ENDPOINTS
+### ===================================================================
+
+### 33. Get media by location
+GET {{baseUrl}}/api/media/location/{{locationId}}
+
+### 34. Create media
+POST {{baseUrl}}/api/media
+Content-Type: application/json
+
+{
+    "locationId": "{{locationId}}",
+    "url": "https://images.test.com/cafe1.jpg",
+    "thumbnailUrl": "https://images.test.com/cafe1_thumb.jpg",
+    "caption": "Fachada del cafe",
+    "type": "Image",
+    "isCover": true,
+    "sortOrder": 1,
+    "uploadedByUserId": "{{ownerId}}"
+}
+
+### 35. Get media by ID
+GET {{baseUrl}}/api/media/{{mediaId}}
+
+### 36. Update media
+PUT {{baseUrl}}/api/media/{{mediaId}}
+Content-Type: application/json
+
+{
+    "id": "{{mediaId}}",
+    "locationId": "{{locationId}}",
+    "url": "https://images.test.com/cafe1_updated.jpg",
+    "thumbnailUrl": "https://images.test.com/cafe1_thumb_updated.jpg",
+    "caption": "Fachada actualizada",
+    "type": "Image",
+    "isCover": true,
+    "sortOrder": 1,
+    "uploadedByUserId": "{{ownerId}}"
+}
+
+### 37. Delete media
+DELETE {{baseUrl}}/api/media/{{mediaId}}
+
+### ===================================================================
+### COLLECTION ENDPOINTS
+### ===================================================================
+
+### 38. Get collections by user
+GET {{baseUrl}}/api/collection/user/{{ownerId}}
+
+### 39. Create collection
+POST {{baseUrl}}/api/collection
+Content-Type: application/json
+
+{
+    "name": "Mis Cafes Favoritos Test",
+    "description": "Coleccion de mis cafeterias favoritas en CDMX",
+    "visibility": "Public",
+    "ownerId": "{{ownerId}}"
+}
+
+### 40. Get collection by ID
+GET {{baseUrl}}/api/collection/{{collectionId}}
+
+### 41. Update collection
+PUT {{baseUrl}}/api/collection/{{collectionId}}
+Content-Type: application/json
+
+{
+    "id": "{{collectionId}}",
+    "name": "Mis Cafes Favoritos MOD",
+    "description": "Coleccion actualizada",
+    "visibility": "Unlisted",
+    "ownerId": "{{ownerId}}"
+}
+
+### 42. Add item to collection
+POST {{baseUrl}}/api/collection/{{collectionId}}/items
+Content-Type: application/json
+
+{
+    "locationId": "{{locationId}}",
+    "notes": "Mi cafe favorito para trabajar"
+}
+
+### 43. Remove item from collection
+DELETE {{baseUrl}}/api/collection/{{collectionId}}/items/{{locationId}}
+
+### 44. Delete collection
+DELETE {{baseUrl}}/api/collection/{{collectionId}}

@@ -1,8 +1,3 @@
-﻿namespace WebAppTest1.DTOs
-{
-    public class UserDto
-    {
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
-}
+namespace rmrLocationsApi.DTOs;
+
+public record UserDto(string UserName, string Email, string Password);

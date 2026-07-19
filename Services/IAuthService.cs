@@ -1,7 +1,7 @@
-﻿using WebAppTest1.DTOs;
-using WebAppTest1.Models;
+﻿using rmrLocationsApi.DTOs;
+using rmrLocationsApi.Models;
 
-namespace WebAppTest1.Services
+namespace rmrLocationsApi.Services
 {
     public interface IAuthService
     {

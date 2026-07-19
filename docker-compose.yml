@@ -1,0 +1,126 @@
+# docker-compose.yml
+# Orquestación: Traefik (proxy SSL) + rmrLocationsApi (.NET 8) + PostgreSQL + PostGIS
+
+services:
+
+  # =============================================
+  # Traefik — Proxy inverso y SSL automático
+  # =============================================
+  traefik:
+    image: traefik:v3.2
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      # Dashboard (solo debug, proteger en producción)
+      - "--api.dashboard=true"
+      # Proveedor Docker
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirección automática HTTP → HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik-certificates:/letsencrypt"
+    networks:
+      - traefik-public
+    labels:
+      # Dashboard de Traefik
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls=true"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_AUTH_USERS:-admin:$$apr1$$xT6aHO5r$$9Qhrm.YbFjKEudvgU5aRg0}"
+
+  # =============================================
+  # rmrLocationsApi — API .NET 8
+  # =============================================
+  api:
+    image: ghcr.io/raymondmr/rmrlocationsapi:latest
+    container_name: rmrlocations-api
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=rmrLocationsApi;Username=postgres;Password=${POSTGRES_PASSWORD:-ChangeMe123!}
+      - AppSettings__Token=${JWT_TOKEN:-MySuperSecureAndRandomKeyThatLooksJustAwesomeAndNeedsToBeVeryVeryLong!!!111oneeleven}
+      - AppSettings__Issuer=${JWT_ISSUER:-rmrLocationsApi}
+      - AppSettings__Audience=${JWT_AUDIENCE:-rmrLocationsApi}
+    networks:
+      - traefik-public
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # Router API
+      - "traefik.http.routers.rmrlocations-api.rule=Host(`api.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.rmrlocations-api.entrypoints=websecure"
+      - "traefik.http.routers.rmrlocations-api.tls=true"
+      - "traefik.http.routers.rmrlocations-api.tls.certresolver=letsencrypt"
+      # Servicio: puerto interno del contenedor
+      - "traefik.http.services.rmrlocations-api.loadbalancer.server.port=8080"
+      # Middlewares de seguridad
+      - "traefik.http.routers.rmrlocations-api.middlewares=api-headers@docker"
+      - "traefik.http.middlewares.api-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
+      - "traefik.http.middlewares.api-headers.headers.customresponseheaders.X-Frame-Options=DENY"
+      - "traefik.http.middlewares.api-headers.headers.customresponseheaders.Referrer-Policy=strict-origin-when-cross-origin"
+
+  # =============================================
+  # PostgreSQL + PostGIS — Base de datos
+  # =============================================
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: rmrlocations-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=rmrLocationsApi
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ChangeMe123!}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rmrLocationsApi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# =============================================
+# REDES
+# =============================================
+networks:
+  traefik-public:
+    name: traefik-public
+    external: false
+  internal:
+    name: rmrlocations-internal
+    external: false
+
+# =============================================
+# VOLÚMENES
+# =============================================
+volumes:
+  traefik-certificates:
+    name: traefik-certificates
+  postgres-data:
+    name: rmrlocations-postgres-data

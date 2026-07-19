@@ -1,0 +1,100 @@
+{
+    "$schema": "http://json.schemastore.org/template",
+    "author": "Ing Ramon Montoya R",
+    "classifications": ["Web", "WebAPI", "ASP.NET Core", "C#"],
+    "identity": "rmrWebAPI_PostgreSQL.Api.Template",
+    "name": "ASP.NET Core Web API (JWT + PostgreSQL)",
+    "shortName": "rmrwebapi_PostgreSQL",
+    "sourceName": "rmrWebApiPostgreSQL",
+    "defaultName": "RmrWebApiPostgreSQL",
+    "description": "Plantilla reutilizable de ASP.NET Core Web API con autenticación JWT Bearer (refresh tokens), Entity Framework Core con PostgreSQL, autorización basada en roles (Admin/User/UserL1-3), Swagger/OpenAPI y manejo global de excepciones.",
+    "tags": {
+        "language": "C#",
+        "type": "project"
+    },
+    "preferNameDirectory": true,
+    "symbols": {
+        "Framework": {
+            "type": "parameter",
+            "datatype": "choice",
+            "isRequired": false,
+            "defaultValue": "net10.0",
+            "description": "Versión del framework .NET de destino.",
+            "choices": [
+                {
+                    "choice": "net8.0",
+                    "description": ".NET 8.0 (LTS)"
+                },
+                {
+                    "choice": "net9.0",
+                    "description": ".NET 9.0"
+                },
+                {
+                    "choice": "net10.0",
+                    "description": ".NET 10.0"
+                }
+            ],
+            "onlyIn": "**/*.csproj",
+            "replaces": "net8.0"
+        },
+        "EnableAuth": {
+            "type": "parameter",
+            "datatype": "bool",
+            "defaultValue": "true",
+            "description": "Incluye autenticación JWT Bearer con refresh tokens y RBAC (roles Admin/User/UserL1-3)."
+        },
+        "EnableSwagger": {
+            "type": "parameter",
+            "datatype": "bool",
+            "defaultValue": "true",
+            "description": "Incluye Swagger/OpenAPI (Swashbuckle). Requiere agregar directivas #if (EnableSwagger) en Program.cs y .csproj para la exclusión condicional de código."
+        }
+    },
+    "sources": [
+        {
+            "exclude": [
+                ".vs/**",
+                ".vs/",
+                ".git/**",
+                ".git/",
+                ".claude/**",
+                ".claude/",
+                "bin/**",
+                "bin/",
+                "obj/**",
+                "obj/",
+                ".template.config/**",
+                ".template.config/",
+                "Prompt de Adecuacion de Template.txt",
+                "CLAUDE.md",
+                "*.slnx",
+                "resources/**",
+                "resources/"
+            ],
+            "modifiers": [
+                {
+                    "condition": "(!EnableAuth)",
+                    "exclude": [
+                        "Controllers/AuthController.cs",
+                        "Services/AuthService.cs",
+                        "Services/IAuthService.cs",
+                        "DTOs/UserDto.cs",
+                        "DTOs/UserResponseDto.cs",
+                        "DTOs/TokenResponseDto.cs",
+                        "DTOs/RefreshTokenRequestDto.cs",
+                        "DTOs/ChangePasswordDto.cs",
+                        "Models/User.cs",
+                        "Models/UserRoles.cs",
+                        "Settings/JwtSettings.cs",
+                        "Data/DbSeeder.cs"
+                    ]
+                }
+            ]
+        }
+    ],
+    "primaryOutputs": [
+        {
+            "path": "rmrLocationsApi.csproj"
+        }
+    ]
+}

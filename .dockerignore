@@ -1,0 +1,51 @@
+# .dockerignore — Archivos que Docker NO debe incluir en la imagen
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Build artifacts
+bin/
+obj/
+*.user
+*.suo
+*.vs/
+.vs/
+
+# NuGet packages (se restauran durante el build)
+packages/
+
+# Test project
+Tests/
+
+# Documentation
+*.md
+!CLAUDE.md
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Environment (contiene secretos)
+.env
+.env.*
+appsettings.Development.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/

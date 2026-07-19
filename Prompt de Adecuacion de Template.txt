@@ -1,0 +1,25 @@
+Prompt de Conversión a Plantilla .NET Custom
+
+Contexto: Actúa como un experto en desarrollo de software .NET y automatización de plantillas. Tengo un proyecto funcional y un archivo .\.template.config\template.json que ha sido copiado de otro proyecto. Necesito que este archivo se adapte perfectamente al proyecto actual para convertirlo en una plantilla reutilizable mediante el comando dotnet new.
+
+Tarea:
+1.- Análisis del Proyecto: Analiza la estructura de carpetas, los espacios de nombres (namespaces) en los archivos .cs, el nombre del archivo .csproj y las configuraciones en appsettings.json. Identifica el nombre principal del proyecto que servirá como base para el reemplazo.
+
+2.-Modificación de template.json: Actualiza el archivo siguiendo estas instrucciones basadas en las mejores prácticas de .NET:
+
+2.1.-Identidad y Nombres: Define un name, shortName e identity únicos y descriptivos para este proyecto
+
+2.2.- Configuración de sourceName: Identifica el string o namespace principal del proyecto actual y colócalo en la propiedad sourceName. Esto es vital para que, al crear un nuevo proyecto, el motor reemplace automáticamente ese nombre en directorios, archivos y namespaces
+
+2.3.-Parámetros (Symbols):
+2.3.1.-Crea un símbolo llamado Framework de tipo choice que permita elegir entre versiones de .NET (ej. net9.0, net10.0), configurando la propiedad replaces para que busque el valor en el .csproj
+
+2.3.2.-Identifica características opcionales (como Swagger o autenticación) y crea símbolos de tipo bool para ellas
+
+2.4.-Lógica Condicional de Archivos: Revisa si hay archivos que deberían ser opcionales (como appsettings.Development.json). Si es así, configura la sección sources con modifiers y condition para excluir dichos archivos si el parámetro correspondiente es falso
+
+2.5.-Metadatos: Asegúrate de incluir los tags correctos para language (C#) y type (project)
+.
+Entregable: 
+Proporcióname el código JSON completo y corregido para el archivo template.json, junto con una breve explicación de qué cadenas de texto identificaste para el sourceName y qué símbolos decidiste parametrizar.
+

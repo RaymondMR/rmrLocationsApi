@@ -1,4 +1,4 @@
-﻿namespace WebAppTest1.DTOs
+﻿namespace rmrLocationsApi.DTOs
 {
     public class TokenResponseDto
     {
