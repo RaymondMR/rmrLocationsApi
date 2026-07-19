@@ -7,7 +7,7 @@ services:
   # Traefik — Proxy inverso y SSL automático
   # =============================================
   traefik:
-    image: traefik:v3.2
+    image: traefik:latest
     container_name: traefik
     restart: unless-stopped
     command:
@@ -82,6 +82,14 @@ services:
       - "traefik.http.middlewares.api-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
       - "traefik.http.middlewares.api-headers.headers.customresponseheaders.X-Frame-Options=DENY"
       - "traefik.http.middlewares.api-headers.headers.customresponseheaders.Referrer-Policy=strict-origin-when-cross-origin"
+
+      # Router por IP (sin dominio) — acceso directo https://92.118.59.247/rmrlocations/api
+      - "traefik.http.routers.rmrlocations-api-ip.rule=Host(`92.118.59.247`) && PathPrefix(`/rmrlocations`)"
+      - "traefik.http.routers.rmrlocations-api-ip.entrypoints=websecure"
+      - "traefik.http.routers.rmrlocations-api-ip.tls=true"
+      - "traefik.http.routers.rmrlocations-api-ip.middlewares=rmrlocations-stripprefix@docker,api-headers@docker"
+      # Middleware para quitar /rmrlocations del path antes de enviar a la API
+      - "traefik.http.middlewares.rmrlocations-stripprefix.stripprefix.prefixes=/rmrlocations"
 
   # =============================================
   # PostgreSQL + PostGIS — Base de datos
