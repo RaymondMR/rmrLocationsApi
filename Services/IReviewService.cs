@@ -9,4 +9,7 @@ public interface IReviewService
     Task<Review> AddReviewAsync(Review review);
     Task<bool> UpdateReviewAsync(Review review);
     Task<bool> DeleteReviewAsync(Guid id);
+
+    // Authorization: author lookup
+    Task<Guid?> GetAuthorIdAsync(Guid reviewId);
 }

@@ -24,15 +24,61 @@ public class LocationService : ILocationService
     // Basic CRUD
     // ------------------------------------------------------------------
 
-    public async Task<List<Location>> GetAllLocationsAsync()
+    public async Task<(List<Location> Items, int TotalCount)> GetLocationsPageAsync(
+        string? name, LocationStatus? status, Guid? categoryId, IReadOnlyCollection<Guid> tagIds,
+        string? sort, int page, int pageSize,
+        Guid? viewerId, bool viewerIsAdmin, CancellationToken ct = default)
     {
-        return await _db.Locations
-            .AsNoTracking()
+        var query = _db.Locations.AsNoTracking().AsQueryable();
+
+        // Visibilidad: los no-admin ven publicados+públicos más sus propios lugares.
+        if (!viewerIsAdmin)
+        {
+            query = viewerId is Guid uid
+                ? query.Where(l => (l.Status == LocationStatus.Published && l.IsPublic) || l.OwnerId == uid)
+                : query.Where(l => l.Status == LocationStatus.Published && l.IsPublic);
+        }
+
+        if (status is not null)
+            query = query.Where(l => l.Status == status);
+
+        if (categoryId is Guid cid)
+            query = query.Where(l => l.LocationCategories.Any(lc => lc.CategoryId == cid));
+
+        foreach (var tagId in tagIds)
+            query = query.Where(l => l.LocationTags.Any(lt => lt.TagId == tagId));
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            var pattern = ToIlikePattern(name);
+            query = query.Where(l => EF.Functions.ILike(l.Name, pattern));
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        query = sort?.ToLowerInvariant() switch
+        {
+            "rating" => query.OrderByDescending(l => l.AverageRating)
+                             .ThenByDescending(l => l.ReviewCount)
+                             .ThenBy(l => l.Name),
+            "recent" => query.OrderByDescending(l => l.CreatedAtUtc),
+            _ => query.OrderBy(l => l.Name),
+        };
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Include(l => l.LocationCategories).ThenInclude(lc => lc.Category)
             .Include(l => l.LocationTags).ThenInclude(lt => lt.Tag)
             .AsSplitQuery()
-            .ToListAsync();
+            .ToListAsync(ct);
+
+        return (items, totalCount);
     }
+
+    /// <summary>Patrón ILIKE con comodines escapados (aprovecha el índice GIN trigram de Name).</summary>
+    private static string ToIlikePattern(string term)
+        => "%" + term.Trim().Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
 
     public async Task<Location?> GetLocationByIdAsync(Guid id)
     {
@@ -90,6 +136,20 @@ public class LocationService : ILocationService
         _db.Locations.Remove(existing);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    /// <summary>
+    /// OwnerId of the location, including soft-deleted ones (needed to authorize restore).
+    /// Null when the location does not exist.
+    /// </summary>
+    public async Task<Guid?> GetOwnerIdAsync(Guid locationId, CancellationToken ct = default)
+    {
+        return await _db.Locations
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(l => l.Id == locationId)
+            .Select(l => (Guid?)l.OwnerId)
+            .FirstOrDefaultAsync(ct);
     }
 
     // ------------------------------------------------------------------
@@ -191,6 +251,7 @@ public class LocationService : ILocationService
         double latitude, double longitude, double radiusMeters,
         IReadOnlyCollection<Guid> categoryIds,
         IReadOnlyCollection<Guid> tagIds,
+        string? name = null,
         CancellationToken ct = default)
     {
         var origin = Geo.Point(latitude, longitude);
@@ -204,6 +265,12 @@ public class LocationService : ILocationService
 
         foreach (var tagId in tagIds)
             query = query.Where(l => l.LocationTags.Any(lt => lt.TagId == tagId));
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            var pattern = ToIlikePattern(name);
+            query = query.Where(l => EF.Functions.ILike(l.Name, pattern));
+        }
 
         return query
             .Include(l => l.LocationCategories).ThenInclude(lc => lc.Category)

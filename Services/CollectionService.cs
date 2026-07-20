@@ -37,6 +37,15 @@ public class CollectionService : ICollectionService
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
+    public async Task<Guid?> GetOwnerIdAsync(Guid collectionId)
+    {
+        return await _db.Collections
+            .AsNoTracking()
+            .Where(c => c.Id == collectionId)
+            .Select(c => (Guid?)c.OwnerId)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<LocationCollection> AddCollectionAsync(LocationCollection collection)
     {
         _db.Collections.Add(collection);

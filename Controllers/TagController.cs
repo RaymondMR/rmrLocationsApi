@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using rmrLocationsApi.Handlers;
 using rmrLocationsApi.Models;
 using rmrLocationsApi.Services;
 
@@ -6,6 +8,7 @@ namespace rmrLocationsApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = UserRoles.Admin)] // gestión solo Admin; las lecturas llevan [AllowAnonymous]
 public class TagController : ControllerBase
 {
     private readonly ITagService _tagService;
@@ -18,6 +21,7 @@ public class TagController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<Tag>>> GetAllTags()
     {
         try
@@ -33,6 +37,7 @@ public class TagController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<ActionResult<Tag>> GetTagById(Guid id)
     {
         try
@@ -62,6 +67,10 @@ public class TagController : ControllerBase
         }
         catch (Exception ex)
         {
+            var mapped = DbErrorMapper.ToActionResult(ex);
+            if (mapped is not null)
+                return mapped;
+
             _logger.LogError(ex, "Error creating tag");
             return StatusCode(500, "An error occurred while creating the tag.");
         }
@@ -84,6 +93,10 @@ public class TagController : ControllerBase
         }
         catch (Exception ex)
         {
+            var mapped = DbErrorMapper.ToActionResult(ex);
+            if (mapped is not null)
+                return mapped;
+
             _logger.LogError(ex, "Error updating tag {TagId}", id);
             return StatusCode(500, "An error occurred while updating the tag.");
         }

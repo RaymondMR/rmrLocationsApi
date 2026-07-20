@@ -1,4 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using rmrLocationsApi.DTOs;
+using rmrLocationsApi.Extensions;
+using rmrLocationsApi.Handlers;
 using rmrLocationsApi.Models;
 using rmrLocationsApi.Services;
 
@@ -6,6 +10,7 @@ namespace rmrLocationsApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // default: escrituras requieren sesión; las lecturas públicas llevan [AllowAnonymous]
 public class LocationController : ControllerBase
 {
     private readonly ILocationService _locationService;
@@ -18,12 +23,44 @@ public class LocationController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<Location>>> GetAllLocations()
+    [AllowAnonymous]
+    public async Task<ActionResult<PagedResult<Location>>> GetAllLocations(
+        [FromQuery] string? name = null,
+        [FromQuery] Guid? categoryId = null,
+        [FromQuery] string tagIds = "",
+        [FromQuery] string? status = null,
+        [FromQuery] string sort = "name",
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         try
         {
-            var locations = await _locationService.GetAllLocationsAsync();
-            return Ok(locations);
+            LocationStatus? statusFilter = null;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                if (!Enum.TryParse<LocationStatus>(status, ignoreCase: true, out var parsed))
+                    return BadRequest("Invalid status. Use Draft, Published or Archived.");
+                statusFilter = parsed;
+            }
+
+            var tIds = string.IsNullOrWhiteSpace(tagIds)
+                ? Array.Empty<Guid>()
+                : tagIds.Split(',').Select(Guid.Parse).ToArray();
+
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
+            var (items, totalCount) = await _locationService.GetLocationsPageAsync(
+                name, statusFilter, categoryId, tIds, sort, page, pageSize,
+                User.GetUserId(), User.IsAdmin());
+
+            return Ok(new PagedResult<Location>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            });
         }
         catch (Exception ex)
         {
@@ -33,6 +70,7 @@ public class LocationController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<ActionResult<Location>> GetLocationById(Guid id)
     {
         try
@@ -57,11 +95,23 @@ public class LocationController : ControllerBase
             if (location == null)
                 return BadRequest("Location data is required.");
 
+            var userId = User.GetUserId();
+            if (userId is null)
+                return Unauthorized();
+
+            // El dueño es quien crea; solo un Admin puede asignar otro dueño explícito.
+            if (!User.IsAdmin() || location.OwnerId == Guid.Empty)
+                location.OwnerId = userId.Value;
+
             var created = await _locationService.AddLocationAsync(location);
             return CreatedAtAction(nameof(GetLocationById), new { id = created.Id }, created);
         }
         catch (Exception ex)
         {
+            var mapped = DbErrorMapper.ToActionResult(ex);
+            if (mapped is not null)
+                return mapped;
+
             _logger.LogError(ex, "Error creating location");
             return StatusCode(500, "An error occurred while creating the location.");
         }
@@ -77,6 +127,12 @@ public class LocationController : ControllerBase
             if (id != location.Id)
                 location.Id = id;
 
+            var ownerId = await _locationService.GetOwnerIdAsync(id);
+            if (ownerId is null)
+                return NotFound();
+            if (!User.IsAdmin() && User.GetUserId() != ownerId)
+                return Forbid();
+
             var updated = await _locationService.UpdateLocationAsync(location);
             if (!updated)
                 return NotFound();
@@ -84,6 +140,10 @@ public class LocationController : ControllerBase
         }
         catch (Exception ex)
         {
+            var mapped = DbErrorMapper.ToActionResult(ex);
+            if (mapped is not null)
+                return mapped;
+
             _logger.LogError(ex, "Error updating location {LocationId}", id);
             return StatusCode(500, "An error occurred while updating the location.");
         }
@@ -94,6 +154,12 @@ public class LocationController : ControllerBase
     {
         try
         {
+            var ownerId = await _locationService.GetOwnerIdAsync(id);
+            if (ownerId is null)
+                return NotFound();
+            if (!User.IsAdmin() && User.GetUserId() != ownerId)
+                return Forbid();
+
             var deleted = await _locationService.DeleteLocationAsync(id);
             if (!deleted)
                 return NotFound();
@@ -109,6 +175,7 @@ public class LocationController : ControllerBase
     // Geo-spatial endpoints
 
     [HttpGet("nearby")]
+    [AllowAnonymous]
     public async Task<ActionResult> GetNearby(
         [FromQuery] double latitude,
         [FromQuery] double longitude,
@@ -128,12 +195,14 @@ public class LocationController : ControllerBase
     }
 
     [HttpGet("search")]
+    [AllowAnonymous]
     public async Task<ActionResult<List<Location>>> Search(
         [FromQuery] double latitude,
         [FromQuery] double longitude,
         [FromQuery] double radiusMeters = 5000,
         [FromQuery] string categoryIds = "",
-        [FromQuery] string tagIds = "")
+        [FromQuery] string tagIds = "",
+        [FromQuery] string name = "")
     {
         try
         {
@@ -145,7 +214,7 @@ public class LocationController : ControllerBase
                 ? Array.Empty<Guid>()
                 : tagIds.Split(',').Select(Guid.Parse).ToArray();
 
-            var results = await _locationService.SearchAsync(latitude, longitude, radiusMeters, catIds, tIds);
+            var results = await _locationService.SearchAsync(latitude, longitude, radiusMeters, catIds, tIds, name);
             return Ok(results);
         }
         catch (Exception ex)
@@ -160,6 +229,12 @@ public class LocationController : ControllerBase
     {
         try
         {
+            var ownerId = await _locationService.GetOwnerIdAsync(id);
+            if (ownerId is null)
+                return NotFound();
+            if (!User.IsAdmin() && User.GetUserId() != ownerId)
+                return Forbid();
+
             var deleted = await _locationService.SoftDeleteLocationAsync(id);
             if (!deleted)
                 return NotFound();
@@ -177,6 +252,12 @@ public class LocationController : ControllerBase
     {
         try
         {
+            var ownerId = await _locationService.GetOwnerIdAsync(id);
+            if (ownerId is null)
+                return NotFound();
+            if (!User.IsAdmin() && User.GetUserId() != ownerId)
+                return Forbid();
+
             var restored = await _locationService.RestoreLocationAsync(id);
             if (!restored)
                 return NotFound();

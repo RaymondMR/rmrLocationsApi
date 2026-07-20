@@ -37,6 +37,15 @@ public class ReviewService : IReviewService
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
+    public async Task<Guid?> GetAuthorIdAsync(Guid reviewId)
+    {
+        return await _db.Reviews
+            .AsNoTracking()
+            .Where(r => r.Id == reviewId)
+            .Select(r => (Guid?)r.UserId)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<Review> AddReviewAsync(Review review)
     {
         _db.Reviews.Add(review);

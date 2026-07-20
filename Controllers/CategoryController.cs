@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using rmrLocationsApi.Handlers;
 using rmrLocationsApi.Models;
 using rmrLocationsApi.Services;
 
@@ -6,6 +8,7 @@ namespace rmrLocationsApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = UserRoles.Admin)] // gestión solo Admin; las lecturas llevan [AllowAnonymous]
 public class CategoryController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
@@ -18,6 +21,7 @@ public class CategoryController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<Category>>> GetAllCategories()
     {
         try
@@ -33,6 +37,7 @@ public class CategoryController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<ActionResult<Category>> GetCategoryById(Guid id)
     {
         try
@@ -62,6 +67,10 @@ public class CategoryController : ControllerBase
         }
         catch (Exception ex)
         {
+            var mapped = DbErrorMapper.ToActionResult(ex);
+            if (mapped is not null)
+                return mapped;
+
             _logger.LogError(ex, "Error creating category");
             return StatusCode(500, "An error occurred while creating the category.");
         }
@@ -84,6 +93,10 @@ public class CategoryController : ControllerBase
         }
         catch (Exception ex)
         {
+            var mapped = DbErrorMapper.ToActionResult(ex);
+            if (mapped is not null)
+                return mapped;
+
             _logger.LogError(ex, "Error updating category {CategoryId}", id);
             return StatusCode(500, "An error occurred while updating the category.");
         }
@@ -94,6 +107,18 @@ public class CategoryController : ControllerBase
     {
         try
         {
+            // El DELETE es soft (interceptor de SaveChanges) y nunca dispara el FK
+            // Restrict, así que la regla "no borrar categorías en uso" se valida aquí.
+            if (await _categoryService.HasDependentsAsync(id))
+            {
+                return Conflict(new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Conflict",
+                    Detail = "The category has locations or subcategories and cannot be deleted."
+                });
+            }
+
             var deleted = await _categoryService.DeleteCategoryAsync(id);
             if (!deleted)
                 return NotFound();
@@ -101,6 +126,10 @@ public class CategoryController : ControllerBase
         }
         catch (Exception ex)
         {
+            var mapped = DbErrorMapper.ToActionResult(ex);
+            if (mapped is not null)
+                return mapped;
+
             _logger.LogError(ex, "Error deleting category {CategoryId}", id);
             return StatusCode(500, "An error occurred while deleting the category.");
         }

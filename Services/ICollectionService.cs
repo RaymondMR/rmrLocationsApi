@@ -11,4 +11,7 @@ public interface ICollectionService
     Task<bool> DeleteCollectionAsync(Guid id);
     Task<bool> AddItemToCollectionAsync(Guid collectionId, Guid locationId, string? notes = null);
     Task<bool> RemoveItemFromCollectionAsync(Guid collectionId, Guid locationId);
+
+    // Authorization: owner lookup
+    Task<Guid?> GetOwnerIdAsync(Guid collectionId);
 }

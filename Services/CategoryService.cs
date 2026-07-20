@@ -80,4 +80,10 @@ public class CategoryService : ICategoryService
         await _db.SaveChangesAsync();
         return true;
     }
+
+    public async Task<bool> HasDependentsAsync(Guid id)
+    {
+        return await _db.LocationCategories.AnyAsync(lc => lc.CategoryId == id)
+            || await _db.Categories.AnyAsync(c => c.ParentCategoryId == id);
+    }
 }

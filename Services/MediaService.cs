@@ -33,6 +33,25 @@ public class MediaService : IMediaService
             .FirstOrDefaultAsync(m => m.Id == id);
     }
 
+    public async Task<Guid?> GetLocationOwnerIdAsync(Guid mediaId)
+    {
+        var locationId = await _db.LocationMedia
+            .AsNoTracking()
+            .Where(m => m.Id == mediaId)
+            .Select(m => (Guid?)m.LocationId)
+            .FirstOrDefaultAsync();
+
+        if (locationId is null)
+            return null;
+
+        return await _db.Locations
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(l => l.Id == locationId)
+            .Select(l => (Guid?)l.OwnerId)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<LocationMedia> AddMediaAsync(LocationMedia media)
     {
         _db.LocationMedia.Add(media);

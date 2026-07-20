@@ -9,4 +9,7 @@ public interface IMediaService
     Task<LocationMedia> AddMediaAsync(LocationMedia media);
     Task<bool> UpdateMediaAsync(LocationMedia media);
     Task<bool> DeleteMediaAsync(Guid id);
+
+    // Authorization: owner of the location this media belongs to
+    Task<Guid?> GetLocationOwnerIdAsync(Guid mediaId);
 }

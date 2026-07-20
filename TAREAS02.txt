@@ -1,0 +1,6 @@
+TAREAS02.txt
+Ahora elabora dos documentos:
+
+1.-Resumen general: Deployment_Resume.md, con los pasos detallados que se hicieron y recomendaciones
+2.-Una nueva guía New_Applications.md, para subir nuevas aplicaciones, para que tengamos una referencia para desplegar futuras aplicaciones en el VPS, con recomendaciones
+3.-Un documento que sirva como la documentación de la api: rmrLocations_help.md, que incluya una guía para hacer modificaciones o cambios y que incluya la lista de los endpoints disponibles y cómo se accede a ellos

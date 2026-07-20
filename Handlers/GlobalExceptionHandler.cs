@@ -10,16 +10,24 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
         Exception exception,
         CancellationToken cancellationToken)
     {
-        logger.LogError(exception, "An unhandled exception occurred.");
-
-        var problemDetails = new ProblemDetails
+        // Constraints de BD que lleguen hasta aquí (p. ej. carrera en register) → 409/400
+        var problemDetails = DbErrorMapper.ToProblemDetails(exception);
+        if (problemDetails is not null)
         {
-            Status = StatusCodes.Status500InternalServerError,
-            Title = "Internal Server Error",
-            Detail = "An unexpected error occurred. Please try again later."
-        };
+            logger.LogWarning(exception, "Database constraint violation mapped to {StatusCode}.", problemDetails.Status);
+        }
+        else
+        {
+            logger.LogError(exception, "An unhandled exception occurred.");
+            problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status500InternalServerError,
+                Title = "Internal Server Error",
+                Detail = "An unexpected error occurred. Please try again later."
+            };
+        }
 
-        httpContext.Response.StatusCode = problemDetails.Status.Value;
+        httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
 
         return true;
