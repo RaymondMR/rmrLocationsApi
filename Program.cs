@@ -23,9 +23,18 @@ builder.Services.AddCors(options =>
     options.AddPolicy("MyCorsPolicy",
         builder =>
         {
-            builder.WithOrigins("http://localhost:3000", "http://localhost:5113", "http://localhost:5173", "https://localhost:5173")
-                   .AllowAnyHeader()
-                   .AllowAnyMethod();
+            builder.SetIsOriginAllowed(origin =>
+            {
+                // Local development
+                if (origin.StartsWith("http://localhost:") || origin.StartsWith("https://localhost:"))
+                    return true;
+                // Cloudflare Pages (preview + production)
+                if (origin.EndsWith(".pages.dev") || origin.EndsWith(".workers.dev"))
+                    return true;
+                return false;
+            })
+            .AllowAnyHeader()
+            .AllowAnyMethod();
         });
 });
 
