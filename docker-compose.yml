@@ -91,18 +91,6 @@ services:
       # Middleware para quitar /rmrlocations del path antes de enviar a la API
       - "traefik.http.middlewares.rmrlocations-stripprefix.stripprefix.prefixes=/rmrlocations"
 
-  # =============================================
-  # Cloudflare Tunnel — SSL valido para la API
-  # =============================================
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: rmrlocations-tunnel
-    restart: unless-stopped
-    command: tunnel run
-    environment:
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-    networks:
-      - internal
 
   # PostgreSQL + PostGIS â€” Base de datos
   # =============================================
