@@ -13,7 +13,7 @@
 2. La sección 3 (contrato de API) y la sección 4 (tipos TypeScript) son **normativas**: no inventar endpoints, parámetros ni campos que no estén aquí.
 3. La sección 3.10 lista las **limitaciones reales del API** y la estrategia obligatoria del lado del cliente para cada una. No intentar "resolverlas" llamando endpoints que no existen.
 4. La sección 7 define la dirección de diseño. Es una dirección concreta, no una sugerencia: seguirla salvo indicación explícita del usuario.
-5. Requisitos no negociables: **diseño moderno, 100 % responsive (mobile-first), dark mode, y los 4 estados de UI (loading / empty / error / success) en cada vista asíncrona.**
+5. Requisitos no negociables: **diseño moderno, 100 % responsive (mobile-first) y los 4 estados de UI (loading / empty / error / success) en cada vista asíncrona.**
 
 ---
 
