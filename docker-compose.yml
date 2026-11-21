@@ -1,56 +1,55 @@
 # docker-compose.yml
-# Orquestación: Traefik (proxy SSL) + rmrLocationsApi (.NET 8) + PostgreSQL + PostGIS
+# Orquestación: Traefik (proxy interno) + rmrLocationsApi (.NET) + PostgreSQL/PostGIS
+#
+# ARQUITECTURA DE DOBLE PROXY
+# ---------------------------
+#   Internet :443 ──► NGINX (host)          ← termina TLS con certificados de Certbot
+#                       │  proxy_pass
+#                       ▼
+#                     127.0.0.1:8081 ──► Traefik (Docker)   ← enruta por Host()
+#                                          │
+#                                          ▼
+#                                        api:8080 ──► postgres:5432
+#
+# Traefik NO gestiona certificados ni ocupa los puertos 80/443: esos son de NGINX.
+# Su configuración estática vive en ./traefik/traefik.yaml.
 
 services:
 
   # =============================================
-  # Traefik — Proxy inverso y SSL automático
+  # Traefik — Proxy inverso INTERNO (sin TLS)
   # =============================================
   traefik:
-    image: traefik:latest
+    # Versión fijada a propósito. `:latest` hace que un `docker compose pull` pueda
+    # introducir un cambio incompatible sin previo aviso: en producción se fija y se
+    # actualiza de forma deliberada. Verifica el tag disponible antes de desplegar.
+    image: traefik:v3
     container_name: traefik
     restart: unless-stopped
-    command:
-      # Dashboard (solo debug, proteger en producción)
-      - "--api.dashboard=true"
-      # Proveedor Docker
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=traefik-public"
-      # Entrypoints
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      # Redirección automática HTTP → HTTPS
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # Let's Encrypt
-      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL:-admin@example.com}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      # Logging
-      - "--log.level=INFO"
-      - "--accesslog=true"
     ports:
-      - "80:80"
-      - "443:443"
+      # ⚠️ EL PREFIJO 127.0.0.1 ES LA PROTECCIÓN PRINCIPAL, NO UFW.
+      # Docker inserta sus propias reglas de iptables por delante de UFW, así que
+      # publicar como "8081:8081" dejaría el puerto accesible desde internet AUNQUE
+      # UFW lo bloquee. Al atarlo a la loopback, el puerto no existe fuera del host.
+      - "127.0.0.1:8081:8081"
     volumes:
+      # Solo lectura: Traefik únicamente necesita observar contenedores, nunca crearlos.
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "traefik-certificates:/letsencrypt"
+      - "./traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro"
     networks:
       - traefik-public
     labels:
-      # Dashboard de Traefik
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.traefik-dashboard.tls=true"
-      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_AUTH_USERS:-admin:$$apr1$$xT6aHO5r$$9Qhrm.YbFjKEudvgU5aRg0}"
+      # El propio Traefik no se publica a través de sí mismo.
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # =============================================
-  # rmrLocationsApi — API .NET 8
+  # rmrLocationsApi — API .NET
   # =============================================
   api:
     image: ghcr.io/raymondmr/rmrlocationsapi:latest    # GHCR requiere minúsculas
@@ -58,8 +57,13 @@ services:
     restart: unless-stopped
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=rmrLocationsApi;Username=postgres;Password=${POSTGRES_PASSWORD:-ChangeMe123!}
-      - AppSettings__Token=${JWT_TOKEN:-MySuperSecureAndRandomKeyThatLooksJustAwesomeAndNeedsToBeVeryVeryLong!!!111oneeleven}
+      # Kestrel escucha HTTP en claro: el TLS lo terminó NGINX en el borde.
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=rmrLocationsApi;Username=postgres;Password=${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env del VPS}
+      # Sin valor por defecto A PROPÓSITO: la clave de firma JWT que había aquí está
+      # publicada en el repositorio. Cualquiera que la conozca puede fabricar tokens
+      # de administrador válidos. Debe ser un secreto único generado en el servidor.
+      - AppSettings__Token=${JWT_TOKEN:?define JWT_TOKEN en el .env del VPS - generar con openssl rand -base64 64}
       - AppSettings__Issuer=${JWT_ISSUER:-rmrLocationsApi}
       - AppSettings__Audience=${JWT_AUDIENCE:-rmrLocationsApi}
     networks:
@@ -70,28 +74,17 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      # Router API
-      - "traefik.http.routers.rmrlocations-api.rule=Host(`api.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.rmrlocations-api.entrypoints=websecure"
-      - "traefik.http.routers.rmrlocations-api.tls=true"
-      - "traefik.http.routers.rmrlocations-api.tls.certresolver=letsencrypt"
-      # Servicio: puerto interno del contenedor
+      # Router de la API. Sin TLS: NGINX ya descifró la petición antes de llegar aquí.
+      - "traefik.http.routers.rmrlocations-api.rule=Host(`api.${DOMAIN:?define DOMAIN en el .env del VPS, ej. DOMAIN=rmrlocations.com}`)"
+      - "traefik.http.routers.rmrlocations-api.entrypoints=web"
+      # Puerto interno del contenedor
       - "traefik.http.services.rmrlocations-api.loadbalancer.server.port=8080"
-      # Middlewares de seguridad
-      - "traefik.http.routers.rmrlocations-api.middlewares=api-headers@docker"
-      - "traefik.http.middlewares.api-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
-      - "traefik.http.middlewares.api-headers.headers.customresponseheaders.X-Frame-Options=DENY"
-      - "traefik.http.middlewares.api-headers.headers.customresponseheaders.Referrer-Policy=strict-origin-when-cross-origin"
+      #
+      # Las cabeceras de seguridad (HSTS, X-Frame-Options, nosniff, Referrer-Policy)
+      # se aplican ahora en NGINX, la capa que termina el TLS. Definirlas también aquí
+      # produciría cabeceras duplicadas en la respuesta.
 
-      # Router por IP (sin dominio) — acceso directo https://92.118.59.247/rmrlocations/api
-      - "traefik.http.routers.rmrlocations-api-ip.rule=Host(`92.118.59.247`) && PathPrefix(`/rmrlocations`)"
-      - "traefik.http.routers.rmrlocations-api-ip.entrypoints=websecure"
-      - "traefik.http.routers.rmrlocations-api-ip.tls=true"
-      - "traefik.http.routers.rmrlocations-api-ip.middlewares=rmrlocations-stripprefix@docker,api-headers@docker"
-      # Middleware para quitar /rmrlocations del path antes de enviar a la API
-      - "traefik.http.middlewares.rmrlocations-stripprefix.stripprefix.prefixes=/rmrlocations"
-
-
+  # =============================================
   # PostgreSQL + PostGIS — Base de datos
   # =============================================
   postgres:
@@ -101,10 +94,15 @@ services:
     environment:
       - POSTGRES_DB=rmrLocationsApi
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ChangeMe123!}
+      # ⚠️ Si cambias esta contraseña DESPUÉS de que el volumen ya exista, PostgreSQL
+      # seguirá usando la que tenía al inicializarse y la API no podrá conectar.
+      # Ver la sección "Trampa de la contraseña" en Refactor_to_NGINX_+_Traefik_Docker.md.
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env del VPS}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
+      # Solo en la red interna: la base de datos NUNCA es alcanzable desde Traefik,
+      # NGINX ni internet. Únicamente el contenedor `api` la ve.
       - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d rmrLocationsApi"]
@@ -127,8 +125,8 @@ networks:
 # =============================================
 # VOLÚMENES
 # =============================================
+# El volumen `traefik-certificates` desapareció: Traefik ya no almacena acme.json.
+# Los certificados viven ahora en /etc/letsencrypt del host, gestionados por Certbot.
 volumes:
-  traefik-certificates:
-    name: traefik-certificates
   postgres-data:
     name: rmrlocations-postgres-data

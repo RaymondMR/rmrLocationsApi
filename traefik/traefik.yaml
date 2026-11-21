@@ -1,0 +1,97 @@
+# traefik/traefik.yaml — Configuración ESTÁTICA de Traefik
+#
+# Arquitectura: NGINX (host, puerto 443) → Traefik (Docker, loopback 8081) → contenedores
+#
+# Traefik YA NO gestiona certificados. En esta arquitectura el TLS lo termina NGINX
+# en el host con certificados de Certbot/Let's Encrypt. Por eso aquí no hay ninguna
+# sección `certificatesResolvers` ni entrypoint `websecure`: sería redundante y
+# supondría un doble cifrado innecesario entre NGINX y Traefik.
+#
+# Este archivo se monta en el contenedor como /etc/traefik/traefik.yaml (solo lectura).
+# La configuración DINÁMICA (routers, servicios) sigue viniendo de las labels de Docker.
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# =============================================
+# ENTRYPOINTS
+# =============================================
+entryPoints:
+  web:
+    # Traefik escucha en el 8081 DENTRO del contenedor. En docker-compose.yml ese
+    # puerto se publica únicamente en 127.0.0.1, de modo que solo NGINX (que corre
+    # en el mismo host) puede alcanzarlo. Nunca queda expuesto a internet.
+    address: ":8081"
+
+    forwardedHeaders:
+      # Sin esta lista, Traefik DESCARTA las cabeceras X-Forwarded-* que envía NGINX
+      # y la API acabaría viendo la IP del proxy en lugar de la del cliente real.
+      # Con ella, Traefik confía en esas cabeceras y las propaga hacia el contenedor.
+      #
+      # Por qué rangos privados y no solo 127.0.0.1: al publicar un puerto, Docker
+      # traduce la conexión y el contenedor ve como origen la IP de la pasarela de
+      # la red bridge (típicamente 172.x.x.x), no la loopback del host.
+      #
+      # Es seguro ser amplio aquí: este entrypoint solo escucha en la loopback del
+      # host, así que ningún cliente de internet puede alcanzarlo para falsificar
+      # cabeceras. La barrera real es el binding, no esta lista.
+      trustedIPs:
+        - "127.0.0.1/32"
+        - "::1/128"
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
+
+# =============================================
+# PROVIDERS
+# =============================================
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    # Ningún contenedor se expone salvo que lo pida explícitamente con
+    # `traefik.enable=true`. Principio de mínima exposición.
+    exposedByDefault: false
+    network: traefik-public
+    watch: true
+
+# =============================================
+# API / DASHBOARD
+# =============================================
+api:
+  dashboard: true
+  # insecure: false es el valor por defecto y aquí es deliberado.
+  # El dashboard NO se publica. Para consultarlo, ver las instrucciones de túnel SSH
+  # en Refactor_to_NGINX_+_Traefik_Docker.md.
+  insecure: false
+
+# =============================================
+# OBSERVABILIDAD
+# =============================================
+log:
+  level: INFO
+  format: common
+
+accessLog:
+  format: common
+  filters:
+    # Solo se registran errores. Registrar todas las peticiones correctas llena el
+    # disco sin aportar nada: NGINX ya lleva su propio access log completo por delante.
+    statusCodes:
+      - "400-599"
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        # Nunca registrar Authorization ni Cookie: contendrían los JWT de los usuarios.
+        User-Agent: keep
+        X-Forwarded-For: keep
+
+# =============================================
+# SALUD
+# =============================================
+# Habilita el endpoint /ping que consulta el healthcheck de docker-compose
+# (`traefik healthcheck --ping`). Sin esta sección el chequeo falla siempre y el
+# contenedor queda marcado como unhealthy aunque esté enrutando correctamente.
+ping:
+  entryPoint: web

@@ -9,10 +9,30 @@ using rmrLocationsApi.Settings;
 using rmrLocationsApi.Handlers;
 using rmrLocationsApi.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
 
 using rmrLocationsApi.Converters;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Cabeceras reenviadas por la cadena de proxies: NGINX → Traefik → esta API.
+// Sin esto, HttpContext.Connection.RemoteIpAddress devuelve la IP de Traefik en
+// lugar de la del cliente real, y Request.Scheme sería "http" pese a que el usuario
+// navegó por HTTPS (NGINX termina el TLS y reenvía en claro por la red interna).
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // Por defecto ASP.NET solo confía en proxies de la loopback. Aquí el proxy es
+    // Traefik, que vive en otro contenedor con IP dinámica de la red de Docker, así
+    // que esa lista blanca nunca coincidiría y las cabeceras se descartarían.
+    //
+    // Vaciarlas es seguro en este despliegue porque el contenedor NO publica ningún
+    // puerto al exterior: solo es alcanzable desde la red interna de Docker, y el
+    // único que enruta hacia él es Traefik. La barrera es el aislamiento de red.
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -149,6 +169,11 @@ using (var scope = app.Services.CreateScope())
         logger.LogError(ex, "An error occurred while seeding the database.");
     }
 }
+
+// DEBE ir primero en el pipeline: reescribe RemoteIpAddress y Request.Scheme a
+// partir de X-Forwarded-For / X-Forwarded-Proto antes de que cualquier otro
+// middleware los lea. Colocarlo después haría que el resto viera datos del proxy.
+app.UseForwardedHeaders();
 
 app.UseExceptionHandler();
 
