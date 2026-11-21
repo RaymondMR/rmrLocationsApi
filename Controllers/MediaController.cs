@@ -29,7 +29,7 @@ public class MediaController : ControllerBase
     {
         try
         {
-            var media = await _mediaService.GetMediaByLocationAsync(locationId);
+            var media = await _mediaService.GetMediaByLocationAsync(locationId, User.GetUserId(), User.IsAdmin());
             return Ok(media);
         }
         catch (Exception ex)
@@ -45,7 +45,7 @@ public class MediaController : ControllerBase
     {
         try
         {
-            var media = await _mediaService.GetMediaByIdAsync(id);
+            var media = await _mediaService.GetMediaByIdAsync(id, User.GetUserId(), User.IsAdmin());
             if (media == null)
                 return NotFound();
             return Ok(media);

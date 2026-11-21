@@ -21,13 +21,19 @@ public class AuthService(
 
     public async Task<TokenResponseDto?> LoginAsync(UserDto request)
     {
-        var user = await context.Users.FirstOrDefaultAsync(u => u.UserName == request.UserName);
+        // Solo lectura: el refresh token se escribe con un UPDATE atómico (StoreRefreshTokenAsync),
+        // sin pasar por el change tracker (ver el comentario de RefreshTokensAsync).
+        var user = await context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserName == request.UserName);
         if (user is null || new PasswordHasher<User>().VerifyHashedPassword(user, user.PasswordHash, request.Password) == PasswordVerificationResult.Failed)
         {
             return null;
         }
 
-        return await CreateTokenResponse(user);
+        // Un login nuevo reemplaza la sesión anterior (un solo refresh token por usuario): gana el último.
+        var refreshToken = GenerateRefreshToken();
+        await StoreRefreshTokenAsync(user.Id, refreshToken, replacing: null);
+
+        return new TokenResponseDto { AccessToken = CreateAccessToken(user), RefreshToken = refreshToken };
     }
 
     public async Task<User?> RegisterAsync(UserDto request)
@@ -59,18 +65,29 @@ public class AuthService(
             return null;
         }
 
-        return await CreateTokenResponse(user);
+        // Rotación atómica (compare-and-swap): el UPDATE solo afecta la fila si el token guardado sigue siendo
+        // el presentado. Si dos refresh llegan a la vez con el mismo token, solo uno rota (1 fila); el otro
+        // pierde la carrera (0 filas) y recibe null -> 401. Con el change tracker, el segundo SaveChanges
+        // chocaba con el token de concurrencia xmin y terminaba en DbUpdateConcurrencyException (500).
+        var newRefreshToken = GenerateRefreshToken();
+        var rotated = await StoreRefreshTokenAsync(user.Id, newRefreshToken, replacing: request.RefreshToken);
+        if (rotated == 0)
+        {
+            return null;
+        }
+
+        return new TokenResponseDto { AccessToken = CreateAccessToken(user), RefreshToken = newRefreshToken };
     }
 
     public async Task LogoutAsync(Guid userId)
     {
-        var user = await context.Users.FindAsync(userId);
-        if (user is not null)
-        {
-            user.RefreshToken = null;
-            user.RefreshTokenExpiryTime = null;
-            await context.SaveChangesAsync();
-        }
+        // UPDATE directo: idempotente y sin conflicto de concurrencia con un refresh/login simultáneo.
+        await context.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.RefreshToken, (string?)null)
+                .SetProperty(u => u.RefreshTokenExpiryTime, (DateTime?)null)
+                .SetProperty(u => u.UpdatedAtUtc, (DateTimeOffset?)DateTimeOffset.UtcNow));
     }
 
     public async Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordDto request)
@@ -87,18 +104,6 @@ public class AuthService(
 
         await context.SaveChangesAsync();
         return true;
-    }
-
-    private async Task<TokenResponseDto> CreateTokenResponse(User user)
-    {
-        var accessToken = CreateAccessToken(user);
-        var refreshToken = await GenerateAndSaveRefreshTokenAsync(user);
-
-        return new TokenResponseDto
-        {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken
-        };
     }
 
     private string CreateAccessToken(User user)
@@ -125,17 +130,26 @@ public class AuthService(
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private async Task<string> GenerateAndSaveRefreshTokenAsync(User user)
+    /// <summary>
+    /// Guarda un refresh token nuevo con un UPDATE atómico (sin change tracker ni token de concurrencia xmin).
+    /// Con <paramref name="replacing"/> es compare-and-swap: solo escribe si el token guardado sigue siendo ese
+    /// y devuelve las filas afectadas (0 = otro request ya lo rotó o lo revocó). Con null escribe siempre
+    /// (login: gana el último).
+    /// </summary>
+    private async Task<int> StoreRefreshTokenAsync(Guid userId, string newRefreshToken, string? replacing)
     {
-        var refreshToken = GenerateRefreshToken();
+        var expiresAt = DateTime.UtcNow.AddDays(7);
 
-        user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        var users = context.Users.Where(u => u.Id == userId);
+        if (replacing is not null)
+        {
+            users = users.Where(u => u.RefreshToken == replacing);
+        }
 
-        context.Update(user);
-        await context.SaveChangesAsync();
-
-        return refreshToken;
+        return await users.ExecuteUpdateAsync(s => s
+            .SetProperty(u => u.RefreshToken, newRefreshToken)
+            .SetProperty(u => u.RefreshTokenExpiryTime, (DateTime?)expiresAt)
+            .SetProperty(u => u.UpdatedAtUtc, (DateTimeOffset?)DateTimeOffset.UtcNow));
     }
 
     private static string GenerateRefreshToken()
@@ -148,9 +162,14 @@ public class AuthService(
 
     private async Task<User?> ValidateRefreshTokenAsync(Guid userId, string refreshToken)
     {
-        var user = await context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
 
-        if (user is null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+        // Un usuario sin sesión (logout / cambio de contraseña) tiene token y vencimiento en null: nunca
+        // debe validar, ni siquiera con un refreshToken null en el request.
+        if (user?.RefreshToken is null
+            || user.RefreshToken != refreshToken
+            || user.RefreshTokenExpiryTime is null
+            || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
         {
             return null;
         }

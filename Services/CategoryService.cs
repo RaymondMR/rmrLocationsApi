@@ -26,15 +26,26 @@ public class CategoryService : ICategoryService
             .ToListAsync();
     }
 
-    public async Task<Category?> GetCategoryByIdAsync(Guid id)
+    public async Task<Category?> GetCategoryByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
-        return await _db.Categories
+        var category = await _db.Categories
             .AsNoTracking()
             .Include(c => c.Children)
             .Include(c => c.ParentCategory)
             .Include(c => c.LocationCategories).ThenInclude(lc => lc.Location)
             .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id);
+
+        // Solo los lugares que el visitante puede ver: un Draft / no público / archivado no se
+        // filtra por aquí (antes se devolvían todos y el frontend los ocultaba).
+        if (category is not null)
+        {
+            category.LocationCategories = category.LocationCategories
+                .Where(lc => lc.Location is not null && lc.Location.IsVisibleTo(viewerId, viewerIsAdmin))
+                .ToList();
+        }
+
+        return category;
     }
 
     public async Task<Category> AddCategoryAsync(Category category)

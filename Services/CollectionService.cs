@@ -16,26 +16,42 @@ public class CollectionService : ICollectionService
         _logger = logger;
     }
 
-    public async Task<List<LocationCollection>> GetCollectionsByUserAsync(Guid userId)
+    public async Task<List<LocationCollection>> GetCollectionsByUserAsync(Guid userId, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
-        return await _db.Collections
+        var collections = await _db.Collections
             .AsNoTracking()
             .Where(c => c.OwnerId == userId)
             .Include(c => c.Items).ThenInclude(i => i.Location)
             .OrderByDescending(c => c.CreatedAtUtc)
             .AsSplitQuery()
             .ToListAsync();
+
+        foreach (var collection in collections)
+            HideInvisibleLocations(collection, viewerId, viewerIsAdmin);
+
+        return collections;
     }
 
-    public async Task<LocationCollection?> GetCollectionByIdAsync(Guid id)
+    public async Task<LocationCollection?> GetCollectionByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
-        return await _db.Collections
+        var collection = await _db.Collections
             .AsNoTracking()
             .Include(c => c.Items).ThenInclude(i => i.Location)
             .Include(c => c.Owner)
             .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (collection is not null)
+            HideInvisibleLocations(collection, viewerId, viewerIsAdmin);
+
+        return collection;
     }
+
+    /// <summary>Quita de la respuesta los items cuyo lugar el visitante no puede ver (Draft ajeno, etc.).</summary>
+    private static void HideInvisibleLocations(LocationCollection collection, Guid? viewerId, bool viewerIsAdmin)
+        => collection.Items = collection.Items
+            .Where(i => i.Location is not null && i.Location.IsVisibleTo(viewerId, viewerIsAdmin))
+            .ToList();
 
     public async Task<Guid?> GetOwnerIdAsync(Guid collectionId)
     {
@@ -86,13 +102,14 @@ public class CollectionService : ICollectionService
         return true;
     }
 
-    public async Task<bool> AddItemToCollectionAsync(Guid collectionId, Guid locationId, string? notes = null)
+    public async Task<bool> AddItemToCollectionAsync(Guid collectionId, Guid locationId, string? notes = null, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
         var collection = await _db.Collections.FindAsync(collectionId);
         if (collection == null)
             return false;
 
-        var locationExists = await _db.Locations.AnyAsync(l => l.Id == locationId);
+        // Solo un lugar que el visitante puede ver: un Draft ajeno se trata como inexistente.
+        var locationExists = await _db.Locations.VisibleTo(viewerId, viewerIsAdmin).AnyAsync(l => l.Id == locationId);
         if (!locationExists)
             return false;
 

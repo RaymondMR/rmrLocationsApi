@@ -16,20 +16,42 @@ public class TagService : ITagService
         _logger = logger;
     }
 
-    public async Task<List<Tag>> GetAllTagsAsync()
+    public async Task<List<Tag>> GetAllTagsAsync(Guid? viewerId = null, bool viewerIsAdmin = false)
     {
-        return await _db.Tags
+        var tags = await _db.Tags
             .AsNoTracking()
-            .Include(t => t.LocationTags)
             .ToListAsync();
+
+        // Solo las filas de unión con lugares que el visitante puede ver: así la nube de tags no cuenta
+        // lugares Draft y no se filtran sus ids. (Subconsulta sobre una consulta capturada fuera del lambda.)
+        var visible = _db.Locations.VisibleTo(viewerId, viewerIsAdmin);
+        var links = await _db.LocationTags
+            .AsNoTracking()
+            .Where(lt => visible.Any(l => l.Id == lt.LocationId))
+            .ToListAsync();
+
+        foreach (var tag in tags)
+            tag.LocationTags = links.Where(lt => lt.TagId == tag.Id).ToList();
+
+        return tags;
     }
 
-    public async Task<Tag?> GetTagByIdAsync(Guid id)
+    public async Task<Tag?> GetTagByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
-        return await _db.Tags
+        var tag = await _db.Tags
             .AsNoTracking()
             .Include(t => t.LocationTags).ThenInclude(lt => lt.Location)
             .FirstOrDefaultAsync(t => t.Id == id);
+
+        // Un Draft / no público / archivado no se revela a terceros por esta ruta.
+        if (tag is not null)
+        {
+            tag.LocationTags = tag.LocationTags
+                .Where(lt => lt.Location is not null && lt.Location.IsVisibleTo(viewerId, viewerIsAdmin))
+                .ToList();
+        }
+
+        return tag;
     }
 
     public async Task<Tag> AddTagAsync(Tag tag)

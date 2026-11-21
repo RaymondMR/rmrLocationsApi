@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using rmrLocationsApi.Extensions;
 using rmrLocationsApi.Handlers;
 using rmrLocationsApi.Models;
 using rmrLocationsApi.Services;
@@ -42,7 +43,7 @@ public class CategoryController : ControllerBase
     {
         try
         {
-            var category = await _categoryService.GetCategoryByIdAsync(id);
+            var category = await _categoryService.GetCategoryByIdAsync(id, User.GetUserId(), User.IsAdmin());
             if (category == null)
                 return NotFound();
             return Ok(category);

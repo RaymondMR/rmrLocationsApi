@@ -1,4 +1,6 @@
-﻿namespace rmrLocationsApi.Models;
+﻿using rmrLocationsApi.Validation;
+
+namespace rmrLocationsApi.Models;
 
 public class LocationCategory
 {
@@ -7,6 +9,9 @@ public class LocationCategory
     public Guid LocationId { get; set; }
     public Location? Location { get; set; }
 
+    // Guid.Empty no es un id válido: llega así cuando el cliente manda solo un 'category' anidado
+    // (el contrato de entrada lo ignora) y sin esta regla EF fallaba con un 500.
+    [NotEmptyGuid]
     public Guid CategoryId { get; set; }
     public Category? Category { get; set; }
 

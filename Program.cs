@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
 
 using rmrLocationsApi.Converters;
+using rmrLocationsApi.Validation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,6 +64,9 @@ builder.Services.AddControllers().AddNewtonsoftJson(options =>
     options.SerializerSettings.Converters.Add(new PointJsonConverter());
     options.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
     options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
+
+    // Blinda la ENTRADA contra el sobre-envío (navegaciones, Id, contadores...). Las respuestas no cambian.
+    options.SerializerSettings.ContractResolver = new InputHardeningContractResolver();
 });
 builder.Services.AddEndpointsApiExplorer();
 

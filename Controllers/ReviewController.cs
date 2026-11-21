@@ -13,11 +13,13 @@ namespace rmrLocationsApi.Controllers;
 public class ReviewController : ControllerBase
 {
     private readonly IReviewService _reviewService;
+    private readonly ILocationService _locationService;
     private readonly ILogger<ReviewController> _logger;
 
-    public ReviewController(IReviewService reviewService, ILogger<ReviewController> logger)
+    public ReviewController(IReviewService reviewService, ILocationService locationService, ILogger<ReviewController> logger)
     {
         _reviewService = reviewService;
+        _locationService = locationService;
         _logger = logger;
     }
 
@@ -27,7 +29,7 @@ public class ReviewController : ControllerBase
     {
         try
         {
-            var reviews = await _reviewService.GetReviewsByLocationAsync(locationId);
+            var reviews = await _reviewService.GetReviewsByLocationAsync(locationId, User.GetUserId(), User.IsAdmin());
             return Ok(reviews);
         }
         catch (Exception ex)
@@ -43,7 +45,7 @@ public class ReviewController : ControllerBase
     {
         try
         {
-            var review = await _reviewService.GetReviewByIdAsync(id);
+            var review = await _reviewService.GetReviewByIdAsync(id, User.GetUserId(), User.IsAdmin());
             if (review == null)
                 return NotFound();
             return Ok(review);
@@ -69,6 +71,10 @@ public class ReviewController : ControllerBase
 
             // La reseña pertenece siempre al usuario autenticado (evita suplantación).
             review.UserId = userId.Value;
+
+            // Solo se puede reseñar un lugar que el visitante puede ver: un Draft ajeno se trata como inexistente.
+            if (!await _locationService.IsVisibleAsync(review.LocationId, userId, User.IsAdmin()))
+                return NotFound("Location not found.");
 
             var created = await _reviewService.AddReviewAsync(review);
             return CreatedAtAction(nameof(GetReviewById), new { id = created.Id }, created);

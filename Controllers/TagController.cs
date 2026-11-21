@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using rmrLocationsApi.Extensions;
 using rmrLocationsApi.Handlers;
 using rmrLocationsApi.Models;
 using rmrLocationsApi.Services;
@@ -26,7 +27,7 @@ public class TagController : ControllerBase
     {
         try
         {
-            var tags = await _tagService.GetAllTagsAsync();
+            var tags = await _tagService.GetAllTagsAsync(User.GetUserId(), User.IsAdmin());
             return Ok(tags);
         }
         catch (Exception ex)
@@ -42,7 +43,7 @@ public class TagController : ControllerBase
     {
         try
         {
-            var tag = await _tagService.GetTagByIdAsync(id);
+            var tag = await _tagService.GetTagByIdAsync(id, User.GetUserId(), User.IsAdmin());
             if (tag == null)
                 return NotFound();
             return Ok(tag);

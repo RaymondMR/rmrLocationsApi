@@ -11,7 +11,11 @@ public interface ILocationService
         string? name, LocationStatus? status, Guid? categoryId, IReadOnlyCollection<Guid> tagIds,
         string? sort, int page, int pageSize,
         Guid? viewerId, bool viewerIsAdmin, CancellationToken ct = default);
-    Task<Location?> GetLocationByIdAsync(Guid id);
+    // Por id con la misma regla de visibilidad que el listado (LocationVisibility): un lugar que el
+    // visitante no puede ver devuelve null (404). Sin visitante = anónimo.
+    Task<Location?> GetLocationByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false);
+    // ¿Puede el visitante ver este lugar? (para proteger sub-recursos: reseñas, medios, colecciones)
+    Task<bool> IsVisibleAsync(Guid locationId, Guid? viewerId = null, bool viewerIsAdmin = false, CancellationToken ct = default);
     Task<Location> AddLocationAsync(Location location);
     Task<bool> UpdateLocationAsync(Location location);
     Task<bool> DeleteLocationAsync(Guid id);

@@ -4,8 +4,9 @@ namespace rmrLocationsApi.Services;
 
 public interface IMediaService
 {
-    Task<List<LocationMedia>> GetMediaByLocationAsync(Guid locationId);
-    Task<LocationMedia?> GetMediaByIdAsync(Guid id);
+    // Un lugar que el visitante no puede ver (LocationVisibility) devuelve lista vacía / null.
+    Task<List<LocationMedia>> GetMediaByLocationAsync(Guid locationId, Guid? viewerId = null, bool viewerIsAdmin = false);
+    Task<LocationMedia?> GetMediaByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false);
     Task<LocationMedia> AddMediaAsync(LocationMedia media);
     Task<bool> UpdateMediaAsync(LocationMedia media);
     Task<bool> DeleteMediaAsync(Guid id);

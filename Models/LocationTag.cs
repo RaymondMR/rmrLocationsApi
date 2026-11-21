@@ -1,4 +1,6 @@
-﻿namespace rmrLocationsApi.Models;
+﻿using rmrLocationsApi.Validation;
+
+namespace rmrLocationsApi.Models;
 
 public class LocationTag
 {
@@ -6,6 +8,8 @@ public class LocationTag
     public Guid LocationId { get; set; }
     public Location? Location { get; set; }
 
+    // Ver LocationCategory.CategoryId: Guid.Empty no es un id válido.
+    [NotEmptyGuid]
     public Guid TagId { get; set; }
     public Tag? Tag { get; set; }
 

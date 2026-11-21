@@ -16,8 +16,12 @@ public class MediaService : IMediaService
         _logger = logger;
     }
 
-    public async Task<List<LocationMedia>> GetMediaByLocationAsync(Guid locationId)
+    public async Task<List<LocationMedia>> GetMediaByLocationAsync(Guid locationId, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
+        // Un lugar que el visitante no puede ver se comporta como un lugar sin medios: no se revela que existe.
+        if (!await _db.Locations.VisibleTo(viewerId, viewerIsAdmin).AnyAsync(l => l.Id == locationId))
+            return [];
+
         return await _db.LocationMedia
             .AsNoTracking()
             .Where(m => m.LocationId == locationId)
@@ -25,12 +29,15 @@ public class MediaService : IMediaService
             .ToListAsync();
     }
 
-    public async Task<LocationMedia?> GetMediaByIdAsync(Guid id)
+    public async Task<LocationMedia?> GetMediaByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
-        return await _db.LocationMedia
+        var media = await _db.LocationMedia
             .AsNoTracking()
             .Include(m => m.Location)
             .FirstOrDefaultAsync(m => m.Id == id);
+
+        // El medio de un lugar que el visitante no puede ver es un 404 (y el Location anidado no se filtra).
+        return media?.Location is { } location && location.IsVisibleTo(viewerId, viewerIsAdmin) ? media : null;
     }
 
     public async Task<Guid?> GetLocationOwnerIdAsync(Guid mediaId)

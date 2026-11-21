@@ -32,12 +32,7 @@ public class LocationService : ILocationService
         var query = _db.Locations.AsNoTracking().AsQueryable();
 
         // Visibilidad: los no-admin ven publicados+públicos más sus propios lugares.
-        if (!viewerIsAdmin)
-        {
-            query = viewerId is Guid uid
-                ? query.Where(l => (l.Status == LocationStatus.Published && l.IsPublic) || l.OwnerId == uid)
-                : query.Where(l => l.Status == LocationStatus.Published && l.IsPublic);
-        }
+        query = query.VisibleTo(viewerId, viewerIsAdmin);
 
         if (status is not null)
             query = query.Where(l => l.Status == status);
@@ -80,10 +75,11 @@ public class LocationService : ILocationService
     private static string ToIlikePattern(string term)
         => "%" + term.Trim().Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
 
-    public async Task<Location?> GetLocationByIdAsync(Guid id)
+    public async Task<Location?> GetLocationByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
         return await _db.Locations
             .AsNoTracking()
+            .VisibleTo(viewerId, viewerIsAdmin) // un Draft / no público / archivado no se revela a terceros
             .Include(l => l.LocationCategories).ThenInclude(lc => lc.Category)
             .Include(l => l.LocationTags).ThenInclude(lt => lt.Tag)
             .Include(l => l.Media)
@@ -92,6 +88,12 @@ public class LocationService : ILocationService
             .AsSplitQuery()
             .FirstOrDefaultAsync(l => l.Id == id);
     }
+
+    public Task<bool> IsVisibleAsync(Guid locationId, Guid? viewerId = null, bool viewerIsAdmin = false, CancellationToken ct = default)
+        => _db.Locations
+            .AsNoTracking()
+            .VisibleTo(viewerId, viewerIsAdmin)
+            .AnyAsync(l => l.Id == locationId, ct);
 
     public async Task<Location> AddLocationAsync(Location location)
     {

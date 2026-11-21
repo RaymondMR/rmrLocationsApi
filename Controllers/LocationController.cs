@@ -75,7 +75,9 @@ public class LocationController : ControllerBase
     {
         try
         {
-            var location = await _locationService.GetLocationByIdAsync(id);
+            // Misma visibilidad que el listado: un Draft / no público / archivado solo lo ve su dueño o
+            // un Admin; para el resto es un 404 (no se revela que existe).
+            var location = await _locationService.GetLocationByIdAsync(id, User.GetUserId(), User.IsAdmin());
             if (location == null)
                 return NotFound();
             return Ok(location);

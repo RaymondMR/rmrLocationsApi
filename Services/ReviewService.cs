@@ -18,8 +18,12 @@ public class ReviewService : IReviewService
         _locationService = locationService;
     }
 
-    public async Task<List<Review>> GetReviewsByLocationAsync(Guid locationId)
+    public async Task<List<Review>> GetReviewsByLocationAsync(Guid locationId, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
+        // Un lugar que el visitante no puede ver se comporta como un lugar sin reseñas: no se revela que existe.
+        if (!await _db.Locations.VisibleTo(viewerId, viewerIsAdmin).AnyAsync(l => l.Id == locationId))
+            return [];
+
         return await _db.Reviews
             .AsNoTracking()
             .Where(r => r.LocationId == locationId)
@@ -28,13 +32,16 @@ public class ReviewService : IReviewService
             .ToListAsync();
     }
 
-    public async Task<Review?> GetReviewByIdAsync(Guid id)
+    public async Task<Review?> GetReviewByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false)
     {
-        return await _db.Reviews
+        var review = await _db.Reviews
             .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.Location)
             .FirstOrDefaultAsync(r => r.Id == id);
+
+        // La reseña de un lugar que el visitante no puede ver es un 404 (y el Location anidado no se filtra).
+        return review?.Location is { } location && location.IsVisibleTo(viewerId, viewerIsAdmin) ? review : null;
     }
 
     public async Task<Guid?> GetAuthorIdAsync(Guid reviewId)

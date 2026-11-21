@@ -30,7 +30,7 @@ public class CollectionController : ControllerBase
             if (!User.IsAdmin() && User.GetUserId() != userId)
                 return Forbid();
 
-            var collections = await _collectionService.GetCollectionsByUserAsync(userId);
+            var collections = await _collectionService.GetCollectionsByUserAsync(userId, User.GetUserId(), User.IsAdmin());
             return Ok(collections);
         }
         catch (Exception ex)
@@ -46,7 +46,7 @@ public class CollectionController : ControllerBase
     {
         try
         {
-            var collection = await _collectionService.GetCollectionByIdAsync(id);
+            var collection = await _collectionService.GetCollectionByIdAsync(id, User.GetUserId(), User.IsAdmin());
             if (collection == null)
                 return NotFound();
 
@@ -161,7 +161,7 @@ public class CollectionController : ControllerBase
                 return Forbid();
 
             var added = await _collectionService.AddItemToCollectionAsync(
-                collectionId, request.LocationId, request.Notes);
+                collectionId, request.LocationId, request.Notes, User.GetUserId(), User.IsAdmin());
             if (!added)
                 return BadRequest("Could not add item. Collection or location not found, or item already in collection.");
             return NoContent();
