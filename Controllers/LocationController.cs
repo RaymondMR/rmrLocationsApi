@@ -31,7 +31,8 @@ public class LocationController : ControllerBase
         [FromQuery] string? status = null,
         [FromQuery] string sort = "name",
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? ownerId = null)
     {
         try
         {
@@ -52,7 +53,7 @@ public class LocationController : ControllerBase
 
             var (items, totalCount) = await _locationService.GetLocationsPageAsync(
                 name, statusFilter, categoryId, tIds, sort, page, pageSize,
-                User.GetUserId(), User.IsAdmin());
+                User.GetUserId(), User.IsAdmin(), ownerId);
 
             return Ok(new PagedResult<Location>
             {

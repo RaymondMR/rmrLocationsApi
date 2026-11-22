@@ -27,12 +27,17 @@ public class LocationService : ILocationService
     public async Task<(List<Location> Items, int TotalCount)> GetLocationsPageAsync(
         string? name, LocationStatus? status, Guid? categoryId, IReadOnlyCollection<Guid> tagIds,
         string? sort, int page, int pageSize,
-        Guid? viewerId, bool viewerIsAdmin, CancellationToken ct = default)
+        Guid? viewerId, bool viewerIsAdmin, Guid? ownerId = null, CancellationToken ct = default)
     {
         var query = _db.Locations.AsNoTracking().AsQueryable();
 
         // Visibilidad: los no-admin ven publicados+públicos más sus propios lugares.
         query = query.VisibleTo(viewerId, viewerIsAdmin);
+
+        // Lugares de un dueño concreto (p. ej. «Mis lugares» del perfil). Va DESPUÉS de la visibilidad: pedir
+        // los lugares de otra persona solo devuelve lo que cualquiera podría ver de ella.
+        if (ownerId is Guid oid)
+            query = query.Where(l => l.OwnerId == oid);
 
         if (status is not null)
             query = query.Where(l => l.Status == status);

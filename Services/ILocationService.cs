@@ -6,11 +6,13 @@ public interface ILocationService
 {
     // Basic CRUD
     // Listado paginado con búsqueda por nombre (ILIKE + índice trigram), filtros y
-    // visibilidad por rol (anónimo: publicados; autenticado: + propios; Admin: todo)
+    // visibilidad por rol (anónimo: publicados; autenticado: + propios; Admin: todo).
+    // ownerId (opcional) limita a los lugares de un dueño, p. ej. «Mis lugares» del perfil; la visibilidad
+    // se aplica igual: el propio dueño ve también sus borradores, los demás solo lo publicado y público.
     Task<(List<Location> Items, int TotalCount)> GetLocationsPageAsync(
         string? name, LocationStatus? status, Guid? categoryId, IReadOnlyCollection<Guid> tagIds,
         string? sort, int page, int pageSize,
-        Guid? viewerId, bool viewerIsAdmin, CancellationToken ct = default);
+        Guid? viewerId, bool viewerIsAdmin, Guid? ownerId = null, CancellationToken ct = default);
     // Por id con la misma regla de visibilidad que el listado (LocationVisibility): un lugar que el
     // visitante no puede ver devuelve null (404). Sin visitante = anónimo.
     Task<Location?> GetLocationByIdAsync(Guid id, Guid? viewerId = null, bool viewerIsAdmin = false);
